@@ -1,1 +1,1 @@
-# Truman-Foundation-Projects
+Inspired by the Truman Movie, i will build a project collection. and show how algorithms shape human behaviour.
