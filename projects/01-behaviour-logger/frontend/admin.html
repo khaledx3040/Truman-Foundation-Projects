@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Truman Director Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <!-- Top bar with filters -->
+    <header class="top-bar director-bar">
+      <div class="top-bar-left">
+        <h1 class="app-title">Truman Director Dashboard</h1>
+        <p class="app-subtitle">Behaviour overview for users 1–5.</p>
+      </div>
+
+      <div class="top-bar-right director-filters">
+        <!-- Segment / topic filter (UI only for now) -->
+        <div class="filter-group">
+          <label class="filter-label">User</label>
+          <select id="admin-user-select" class="admin-select">
+            <option value="all">All users (overview)</option>
+            <option value="user1">user1</option>
+            <option value="user2">user2</option>
+            <option value="user3">user3</option>
+            <option value="user4">user4</option>
+            <option value="user5">user5</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Topic focus</label>
+          <select id="topic-filter" class="admin-select">
+            <option value="all">All topics</option>
+            <option value="Religion">Religion</option>
+            <option value="Left vs Right">Left vs Right</option>
+            <option value="Capitalism">Capitalism</option>
+            <option value="Immigration">Immigration</option>
+            <option value="AI">AI</option>
+            <option value="Society">Society</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Time window</label>
+          <select id="time-filter" class="admin-select" disabled>
+            <option value="all">All time (demo)</option>
+          </select>
+        </div>
+
+        <button class="btn-outline" onclick="window.location.href='index.html'">
+          ← Back to feed
+        </button>
+      </div>
+    </header>
+
+    <main class="director-main">
+      <!-- Metrics strip -->
+      <section class="card metrics-strip">
+        <div class="metric-card">
+          <div class="metric-label">Users included</div>
+          <div class="metric-value-lg" id="m-users">–</div>
+          <div class="metric-note">In current segment</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Total sessions</div>
+          <div class="metric-value-lg" id="m-sessions">–</div>
+          <div class="metric-note">How often they open the feed</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Avg session scroll</div>
+          <div class="metric-value-lg" id="m-scroll">–</div>
+          <div class="metric-note">How deep they go into the feed</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Avg dwell per post</div>
+          <div class="metric-value-lg" id="m-dwell">–</div>
+          <div class="metric-note">Focused viewing time</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Avg reaction latency</div>
+          <div class="metric-value-lg" id="m-latency">–</div>
+          <div class="metric-note">How fast they decide</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Total reactions</div>
+          <div class="metric-value-lg" id="m-total-reactions">–</div>
+          <div class="metric-note">All emotional signals</div>
+        </div>
+      </section>
+
+      <!-- Analytics grid -->
+      <section class="director-grid">
+        <!-- Left column: profile + emotions -->
+        <section class="card director-panel">
+          <h2 class="panel-title" id="detail-title">Overview: all users</h2>
+          <p class="panel-subtitle" id="detail-subtitle">
+            Behaviour fingerprint combining all tracked users.
+          </p>
+
+          <div class="panel-section">
+            <h3 class="section-title">Emotional profile</h3>
+            <p class="section-subtitle">
+              Distribution of reactions for the selected user / group.
+            </p>
+            <div id="reaction-bars" class="emotion-bars">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+
+          <div class="panel-section">
+            <h3 class="section-title">Decision speed</h3>
+            <p class="section-subtitle">
+              How quickly they react once a post comes into focus.
+            </p>
+            <div class="decision-speed">
+              <div class="decision-speed-main" id="decision-speed-main">No data yet.</div>
+              <div class="decision-speed-meta" id="decision-speed-meta"></div>
+            </div>
+          </div>
+
+          <div class="panel-section">
+            <h3 class="section-title">Ideology Spectrum</h3>
+            <p class="section-subtitle" id="ideology-spectrum-subtitle">
+              Ideological positioning based on reactions and engagement patterns.
+            </p>
+            <div id="ideology-spectrum" class="ideology-spectrum">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+        </section>
+
+        <!-- Right column: topics + insights -->
+        <section class="card director-panel">
+          <h2 class="panel-title">Topic sensitivity</h2>
+          <p class="panel-subtitle">
+            Topics where they spend the most time and react the most.
+          </p>
+
+          <ul id="topic-list" class="topic-list advanced-topic-list">
+            <!-- Filled by JS -->
+          </ul>
+
+          <div class="panel-section-divider"></div>
+
+          <div class="panel-section">
+            <h3 class="section-title">Behavioural insights</h3>
+            <p class="section-subtitle">
+              Simple narrative flags derived from the metrics above.
+            </p>
+            <ul id="insights-list" class="insights-list">
+              <!-- Filled by JS -->
+            </ul>
+          </div>
+
+          <div class="panel-section-divider"></div>
+
+          <div class="panel-section">
+            <h3 class="section-title">Psychological Profile</h3>
+            <p class="section-subtitle">
+              Derived psychological dimensions based on behavior patterns.
+            </p>
+            <div id="psychological-profile" class="psychological-profile">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

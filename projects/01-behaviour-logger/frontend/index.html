@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Behaviour Logger – Demo Feed</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-container">
+
+      <!-- LOGIN VIEW -->
+      <section id="login-view" class="card">
+        <h1>Truman Behaviour Lab</h1>
+        <p class="subtitle">Log in as one of the demo users to start tracking behaviour.</p>
+
+        <form id="login-form">
+          <label for="account-select">Choose an account:</label>
+          <select id="account-select">
+            <option value="" disabled selected>Choose an account…</option>
+            <option value="user1">user1</option>
+            <option value="user2">user2</option>
+            <option value="user3">user3</option>
+            <option value="user4">user4</option>
+            <option value="user5">user5</option>
+            <option value="admin">Admin dashboard</option>
+          </select>
+
+          <button type="submit" class="primary-btn">Start Feed</button>
+        </form>
+      </section>
+
+      <!-- MAIN FEED VIEW -->
+      <section id="feed-view" class="hidden">
+        <header class="top-bar">
+          <div>
+            <h2>Truman Behaviour Feed</h2>
+            <p id="current-user-label" class="subtitle"></p>
+          </div>
+          <div class="top-bar-actions">
+            <button id="refresh-btn" class="secondary-btn">Refresh feed</button>
+            <button id="logout-btn" class="secondary-btn">Log out</button>
+          </div>
+        </header>
+
+        <div class="posts-container">
+
+          <!-- 1: Religion -->
+          <article class="post" data-post-id="post1" data-topic="religion">
+            <div class="post-inner">
+              <div class="post-header-row">
+                <h3>Government Approves New Mosque Construction Amid Public Outcry</h3>
+                <span class="topic-tag">Religion</span>
+              </div>
+              <p>The approval sparked heated protests, with critics arguing that rapid religious expansion threatens "cultural identity."</p>
+              <div class="reactions">
+                <button class="reaction-btn" data-reaction="like">👍 Like</button>
+                <button class="reaction-btn" data-reaction="love">❤️ Love</button>
+                <button class="reaction-btn" data-reaction="sad">😢 Sad</button>
+                <button class="reaction-btn" data-reaction="angry">😡 Angry</button>
+                <button class="reaction-btn" data-reaction="funny">😂 Funny</button>
+              </div>
+            </div>
+          </article>
+        
+          <!-- 2: Religion -->
+          <article class="post" data-post-id="post2" data-topic="religion">
+            <div class="post-inner">
+              <div class="post-header-row">
+                <h3>Church Leader Says Society Is "Morally Collapsing," Blames Rise of Atheism</h3>
+                <span class="topic-tag">Religion</span>
+              </div>
+              <p>The comments received massive backlash online, with many accusing religious groups of fear-mongering.</p>
+              <div class="reactions">
+                <button class="reaction-btn" data-reaction="like">👍 Like</button>
+                <button class="reaction-btn" data-reaction="love">❤️ Love</button>
+                <button class="reaction-btn" data-reaction="sad">😢 Sad</button>
+                <button class="reaction-btn" data-reaction="angry">😡 Angry</button>
+                <button class="reaction-btn" data-reaction="funny">😂 Funny</button>
+              </div>
+            </div>
+          </article>
+        
+          <!-- 3: Left vs Right -->
+          <article class="post" data-post-id="post3" data-topic="left-right">
+            <div class="post-inner">
+              <div class="post-header-row">
+                <h3>Left-Wing Party Proposes 90% Tax on Millionaires</h3>
+                <span class="topic-tag">Left vs Right</span>
+              </div>
+              <p>The proposal shocked financial sectors, with business leaders warning of a "mass exodus of talent."</p>
+              <div class="reactions">
+                <button class="reaction-btn" data-reaction="like">👍 Like</button>
+                <button class="reaction-btn" data-reaction="love">❤️ Love</button>
+                <button class="reaction-btn" data-reaction="sad">😢 Sad</button>
+                <button class="reaction-btn" data-reaction="angry">😡 Angry</button>
+                <button class="reaction-btn" data-reaction="funny">😂 Funny</button>
+              </div>
+            </div>
+          </article>
+        
+          <!-- 4: Left vs Right -->
+          <article class="post" data-post-id="post4" data-topic="left-right">
+            <div class="post-inner">
+              <div class="post-header-row">
+                <h3>Right-Wing Rally Draws Record Crowds, Critics Warn of "Rising Extremism"</h3>
+                <span class="topic-tag">Left vs Right</span>
+              </div>
+              <p>The event showcased strong nationalist messages, sparking fears of growing political polarisation.</p>
+              <div class="reactions">
+                <button class="reaction-btn" data-reaction="like">👍 Like</button>
+                <button class="reaction-btn" data-reaction="love">❤️ Love</button>
+                <button class="reaction-btn" data-reaction="sad">😢 Sad</button>
+                <button class="reaction-btn" data-reaction="angry">😡 Angry</button>
+                <button class="reaction-btn" data-reaction="funny">😂 Funny</button>
+              </div>
+            </div>
+          </article>
+        
+          <!-- 5: Capitalism -->
+          <article class="post" data-post-id="post5" data-topic="economic-systems">
+            <div class="post-inner">
+              <div class="post-header-row">
+                <h3>Billionaire Buys Entire Rural Town, Residents Fear Loss of Autonomy</h3>
+                <span class="topic-tag">Capitalism</span>
+              </div>
+              <p>Locals say capitalism has turned their homes into "luxury playgrounds for the wealthy."</p>
+              <div class="reactions">
+                <button class="reaction-btn" data-reaction="like">👍 Like</button>
+                <button class="reaction-btn" data-reaction="love">❤️ Love</button>
+                <button class="reaction-btn" data-reaction="sad">😢 Sad</button>
+                <button class="reaction-btn" data-reaction="angry">😡 Angry</button>
+                <button class="reaction-btn" data-reaction="funny">😂 Funny</button>
+              </div>
+            </div>
+          </article>
+        
+          <!-- 6: Communism -->
+          <article class="post" data-post-id="post6" data-topic="economic-systems">
+            <div class="post-inner">
+              <div class="post-header-row">
+                <h3>Communist Party Revival in Universities Stuns Officials</h3>
+                <span class="topic-tag">Communism</span>
+              </div>
+              <p>Membership among students has tripled, driven by frustration over inequality and corporate power.</p>
+              <div class="reactions">
+                <button class="reaction-btn" data-reaction="like">👍 Like</button>
+                <button class="reaction-btn" data-reaction="love">❤️ Love</button>
+                <button class="reaction-btn" data-reaction="sad">😢 Sad</button>
+                <button class="reaction-btn" data-reaction="angry">😡 Angry</button>
+                <button class="reaction-btn" data-reaction="funny">😂 Funny</button>
+              </div>
+            </div>
+          </article>
+        
+          <!-- 7: Capitalism -->
+          <article class="post" data-post-id="post7" data-topic="economic-systems">
+            <div class="post-inner">
+              <div class="post-header-row">
+                <h3>Tech Corporation Accused of Running "Digital Sweatshops"</h3>
+                <span class="topic-tag">Capitalism</span>
+              </div>
+              <p>Employees report punishing 16-hour AI training shifts for minimal pay under abusive conditions.</p>
+              <div class="reactions">
+                <button class="reaction-btn" data-reaction="like">👍 Like</button>
+                <button class="reaction-btn" data-reaction="love">❤️ Love</button>
+                <button class="reaction-btn" data-reaction="sad">😢 Sad</button>
+                <button class="reaction-btn" data-reaction="angry">😡 Angry</button>
+                <button class="reaction-btn" data-reaction="funny">😂 Funny</button>
+              </div>
+            </div>
+          </article>
+        
+          <!-- 8: Surveillance -->
+          <article class="post" data-post-id="post8" data-topic="surveillance">
+            <div class="post-inner">
+              <div class="post-header-row">
+                <h3>City Deploys AI Cameras That Track "Suspicious Behaviour" Automatically</h3>
+                <span class="topic-tag">Surveillance</span>
+              </div>
+              <p>Civil rights groups warn this could push society into permanent monitoring.</p>
+              <div class="reactions">
+                <button class="reaction-btn" data-reaction="like">👍 Like</button>
+                <button class="reaction-btn" data-reaction="love">❤️ Love</button>
+                <button class="reaction-btn" data-reaction="sad">😢 Sad</button>
+                <button class="reaction-btn" data-reaction="angry">😡 Angry</button>
+                <button class="reaction-btn" data-reaction="funny">😂 Funny</button>
+              </div>
+            </div>
+          </article>
+        
+          <!-- 9: Surveillance -->
+          <article class="post" data-post-id="post9" data-topic="surveillance">
+            <div class="post-inner">
+              <div class="post-header-row">
+                <h3>Social Credit System Trial Quietly Launched in Several Districts</h3>
+                <span class="topic-tag">Surveillance</span>
+              </div>
+              <p>Residents with low scores reportedly lose access to essential services.</p>
+              <div class="reactions">
+                <button class="reaction-btn" data-reaction="like">👍 Like</button>
+                <button class="reaction-btn" data-reaction="love">❤️ Love</button>
+                <button class="reaction-btn" data-reaction="sad">😢 Sad</button>
+                <button class="reaction-btn" data-reaction="angry">😡 Angry</button>
+                <button class="reaction-btn" data-reaction="funny">😂 Funny</button>
+              </div>
+            </div>
+          </article>
+        
+          <!-- 10: Immigration -->
+          <article class="post" data-post-id="post10" data-topic="immigration">
+            <div class="post-inner">
+              <div class="post-header-row">
+                <h3>Government Announces Plan to Halve Immigration Next Year</h3>
+                <span class="topic-tag">Immigration</span>
+              </div>
+              <p>Businesses warn of labour shortages, while supporters call it "protecting cultural balance."</p>
+              <div class="reactions">
+                <button class="reaction-btn" data-reaction="like">👍 Like</button>
+                <button class="reaction-btn" data-reaction="love">❤️ Love</button>
+                <button class="reaction-btn" data-reaction="sad">😢 Sad</button>
+                <button class="reaction-btn" data-reaction="angry">😡 Angry</button>
+                <button class="reaction-btn" data-reaction="funny">😂 Funny</button>
+              </div>
+            </div>
+          </article>
+        
+          <!-- 11: Immigration -->
+          <article class="post" data-post-id="post11" data-topic="immigration">
+            <div class="post-inner">
+              <div class="post-header-row">
+                <h3>Viral Video Shows Migrants Sleeping Outside Closed Border Facility</h3>
+                <span class="topic-tag">Immigration</span>
+              </div>
+              <p>The footage has reignited fierce debate on national responsibility and humanitarian duty.</p>
+              <div class="reactions">
+                <button class="reaction-btn" data-reaction="like">👍 Like</button>
+                <button class="reaction-btn" data-reaction="love">❤️ Love</button>
+                <button class="reaction-btn" data-reaction="sad">😢 Sad</button>
+                <button class="reaction-btn" data-reaction="angry">😡 Angry</button>
+                <button class="reaction-btn" data-reaction="funny">😂 Funny</button>
+              </div>
+            </div>
+          </article>
+        
+          <!-- 12: AI -->
+          <article class="post" data-post-id="post12" data-topic="ai">
+            <div class="post-inner">
+              <div class="post-header-row">
+                <h3>Major Retail Chain Replaces 80% of Employees With AI Cashiers</h3>
+                <span class="topic-tag">AI</span>
+              </div>
+              <p>Workers describe the move as "cruel" and "deeply destabilising" for ordinary families.</p>
+              <div class="reactions">
+                <button class="reaction-btn" data-reaction="like">👍 Like</button>
+                <button class="reaction-btn" data-reaction="love">❤️ Love</button>
+                <button class="reaction-btn" data-reaction="sad">😢 Sad</button>
+                <button class="reaction-btn" data-reaction="angry">😡 Angry</button>
+                <button class="reaction-btn" data-reaction="funny">😂 Funny</button>
+              </div>
+            </div>
+          </article>
+        
+          <!-- 13: AI -->
+          <article class="post" data-post-id="post13" data-topic="ai">
+            <div class="post-inner">
+              <div class="post-header-row">
+                <h3>AI Model Predicts Crime Before It Happens — Pilot Program Launches Tomorrow</h3>
+                <span class="topic-tag">AI</span>
+              </div>
+              <p>Ethicists warn it could criminalise innocent people based on statistical errors and hidden biases.</p>
+              <div class="reactions">
+                <button class="reaction-btn" data-reaction="like">👍 Like</button>
+                <button class="reaction-btn" data-reaction="love">❤️ Love</button>
+                <button class="reaction-btn" data-reaction="sad">😢 Sad</button>
+                <button class="reaction-btn" data-reaction="angry">😡 Angry</button>
+                <button class="reaction-btn" data-reaction="funny">😂 Funny</button>
+              </div>
+            </div>
+          </article>
+        
+          <!-- 14: Society -->
+          <article class="post" data-post-id="post14" data-topic="society">
+            <div class="post-inner">
+              <div class="post-header-row">
+                <h3>Study Claims Modern Relationships Are Failing Due to "Hyper-Individualism"</h3>
+                <span class="topic-tag">Society</span>
+              </div>
+              <p>The study warns society may be abandoning commitment, stability, and long-term bonding.</p>
+              <div class="reactions">
+                <button class="reaction-btn" data-reaction="like">👍 Like</button>
+                <button class="reaction-btn" data-reaction="love">❤️ Love</button>
+                <button class="reaction-btn" data-reaction="sad">😢 Sad</button>
+                <button class="reaction-btn" data-reaction="angry">😡 Angry</button>
+                <button class="reaction-btn" data-reaction="funny">😂 Funny</button>
+              </div>
+            </div>
+          </article>
+        
+          <!-- 15: Society -->
+          <article class="post" data-post-id="post15" data-topic="society">
+            <div class="post-inner">
+              <div class="post-header-row">
+                <h3>Fast-Growing Movement Encourages People to Avoid Having Children</h3>
+                <span class="topic-tag">Society</span>
+              </div>
+              <p>Critics call it anti-human propaganda; supporters argue it's the only ethical response to climate collapse.</p>
+              <div class="reactions">
+                <button class="reaction-btn" data-reaction="like">👍 Like</button>
+                <button class="reaction-btn" data-reaction="love">❤️ Love</button>
+                <button class="reaction-btn" data-reaction="sad">😢 Sad</button>
+                <button class="reaction-btn" data-reaction="angry">😡 Angry</button>
+                <button class="reaction-btn" data-reaction="funny">😂 Funny</button>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
