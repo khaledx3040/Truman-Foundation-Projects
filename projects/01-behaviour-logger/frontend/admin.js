@@ -110,12 +110,15 @@ function buildAggregateUser(userMap) {
     }
 
     // Aggregate ideology spectrum (average scores)
+    // Handle both old format (number) and new format (object with score)
     if (u.ideology_spectrum) {
-      for (const [axis, score] of Object.entries(u.ideology_spectrum)) {
+      for (const [axis, scoreData] of Object.entries(u.ideology_spectrum)) {
         if (agg.ideology_spectrum[axis] === undefined) {
           agg.ideology_spectrum[axis] = { sum: 0, count: 0 };
         }
-        agg.ideology_spectrum[axis].sum += score || 50; // Default to 50 if null
+        // Extract score from old or new format
+        const score = typeof scoreData === "number" ? scoreData : (scoreData.score || 50);
+        agg.ideology_spectrum[axis].sum += score;
         agg.ideology_spectrum[axis].count += 1;
       }
     }
@@ -135,6 +138,13 @@ function buildAggregateUser(userMap) {
   }
 
   // Aggregate psychological profiles (average scores)
+  // Handle both old format (numbers) and new format (objects with score/confidence)
+  function extractScore(metric) {
+    if (typeof metric === "number") return metric;
+    if (typeof metric === "object" && metric.score !== undefined) return metric.score;
+    return 0;
+  }
+
   const profileSums = {
     engagement_level: 0,
     emotional_intensity: 0,
@@ -146,10 +156,18 @@ function buildAggregateUser(userMap) {
   users.forEach((u) => {
     if (u.psychological_profile) {
       const p = u.psychological_profile;
-      profileSums.engagement_level += p.engagement_level || 0;
-      profileSums.emotional_intensity += p.emotional_intensity || 0;
-      profileSums.decision_speed_score += p.decision_speed_score || 50;
-      profileSums.controversy_seeking += p.controversy_seeking || 0;
+      profileSums.engagement_level += extractScore(p.engagement_level);
+      profileSums.emotional_intensity += extractScore(p.emotional_intensity);
+      
+      // Handle decision_speed which might be object or separate score field
+      const ds = p.decision_speed;
+      if (typeof ds === "object" && ds.score !== undefined) {
+        profileSums.decision_speed_score += ds.score;
+      } else {
+        profileSums.decision_speed_score += extractScore(p.decision_speed_score) || 50;
+      }
+      
+      profileSums.controversy_seeking += extractScore(p.controversy_seeking);
       profileCount += 1;
     }
   });
@@ -254,30 +272,68 @@ function renderEmotionalProfile(user) {
   });
 }
 
-function renderDecisionSpeed(user) {
+function renderDecisionSpeed(user, userMap, isAllUsers) {
   const main = document.getElementById("decision-speed-main");
   const meta = document.getElementById("decision-speed-meta");
 
-  if (!user.avg_latency_ms) {
-    main.textContent = "No reaction-timing data yet.";
-    meta.textContent = "";
-    return;
-  }
+  if (isAllUsers && userMap) {
+    // Overview mode: show cohort statistics
+    const users = Object.values(userMap).filter(u => u.avg_latency_ms != null);
+    
+    if (users.length === 0) {
+      main.textContent = "No reaction-timing data yet for the group.";
+      meta.textContent = "";
+      return;
+    }
 
-  const seconds = user.avg_latency_ms / 1000;
-  let label;
-  if (seconds < 2) {
-    label = "Impulsive";
-  } else if (seconds < 8) {
-    label = "Considered";
+    const latencyValues = users.map(u => u.avg_latency_ms / 1000);
+    const avgLatency = latencyValues.reduce((a, b) => a + b, 0) / latencyValues.length;
+    const minLatency = Math.min(...latencyValues);
+    const maxLatency = Math.max(...latencyValues);
+    const minUser = users.find(u => (u.avg_latency_ms / 1000) === minLatency);
+    const maxUser = users.find(u => (u.avg_latency_ms / 1000) === maxLatency);
+
+    let label;
+    if (avgLatency < 2) {
+      label = "Group average: Impulsive";
+    } else if (avgLatency < 8) {
+      label = "Group average: Considered";
+    } else {
+      label = "Group average: Hesitant / reflective";
+    }
+
+    let rangeText = `Range: ${minLatency.toFixed(1)}s–${maxLatency.toFixed(1)}s`;
+    if (minUser && maxUser && minUser !== maxUser) {
+      rangeText += ` (fastest: ${minUser.user_id.replace("user", "u")}, slowest: ${maxUser.user_id.replace("user", "u")})`;
+    }
+
+    main.textContent = `${label} (${avgLatency.toFixed(1)}s avg). ${rangeText}.`;
+
+    meta.textContent =
+      "Group average based on the time between first seeing a post in focus and pressing a reaction button.";
   } else {
-    label = "Hesitant / reflective";
+    // Single-user mode: keep original behavior
+    if (!user.avg_latency_ms) {
+      main.textContent = "No reaction-timing data yet.";
+      meta.textContent = "";
+      return;
+    }
+
+    const seconds = user.avg_latency_ms / 1000;
+    let label;
+    if (seconds < 2) {
+      label = "Impulsive";
+    } else if (seconds < 8) {
+      label = "Considered";
+    } else {
+      label = "Hesitant / reflective";
+    }
+
+    main.textContent = `${label} (${seconds.toFixed(1)}s average reaction time)`;
+
+    meta.textContent =
+      "Based on the time between first seeing a post in focus and pressing a reaction button.";
   }
-
-  main.textContent = `${label} (${seconds.toFixed(1)}s average reaction time)`;
-
-  meta.textContent =
-    "Based on the time between first seeing a post in focus and pressing a reaction button.";
 }
 
 function renderTopics(user, topicFilterValue) {
@@ -323,64 +379,144 @@ function renderTopics(user, topicFilterValue) {
   });
 }
 
-function renderInsights(user) {
+function renderInsights(user, userMap, isAllUsers) {
   const ul = document.getElementById("insights-list");
   ul.innerHTML = "";
 
   const insights = [];
 
-  if (user.avg_max_scroll != null) {
-    if (user.avg_max_scroll > 75) {
-      insights.push("Deep scroller: consistently explores most of the feed.");
-    } else if (user.avg_max_scroll < 30) {
-      insights.push(
-        "Shallow scroller: rarely goes beyond the first part of the feed."
-      );
-    }
-  }
+  if (isAllUsers && userMap) {
+    // Overview mode: generate cohort-level insights
+    const users = Object.values(userMap);
+    const usersWithScroll = users.filter(u => u.avg_max_scroll != null);
+    const usersWithDwell = users.filter(u => u.avg_dwell_ms != null);
+    const usersWithLatency = users.filter(u => u.avg_latency_ms != null);
 
-  if (user.avg_dwell_ms != null) {
-    const s = user.avg_dwell_ms / 1000;
-    if (s > 40) {
-      insights.push(
-        "High attention: tends to spend a long time on each post in focus."
-      );
-    } else if (s < 10) {
-      insights.push(
-        "Low attention: glances over posts quickly before moving on."
-      );
+    // Scroll insights
+    if (usersWithScroll.length > 0) {
+      const scrollValues = usersWithScroll.map(u => u.avg_max_scroll);
+      const avgScroll = scrollValues.reduce((a, b) => a + b, 0) / scrollValues.length;
+      const minScroll = Math.min(...scrollValues);
+      const maxScroll = Math.max(...scrollValues);
+      const minUser = usersWithScroll.find(u => u.avg_max_scroll === minScroll);
+      const maxUser = usersWithScroll.find(u => u.avg_max_scroll === maxScroll);
+      
+      if (avgScroll < 30) {
+        insights.push(`Group trend: On average, users scroll shallowly (avg ${avgScroll.toFixed(0)}%). ${maxUser ? `Deepest scroller: ${maxUser.user_id.replace("user", "u")} (${maxScroll.toFixed(0)}%).` : ""}`);
+      } else if (avgScroll > 75) {
+        insights.push(`Group trend: On average, users scroll deeply (avg ${avgScroll.toFixed(0)}%). ${minUser ? `Shallowest scroller: ${minUser.user_id.replace("user", "u")} (${minScroll.toFixed(0)}%).` : ""}`);
+      } else {
+        insights.push(`Average scroll depth: ${avgScroll.toFixed(0)}% (range: ${minScroll.toFixed(0)}%–${maxScroll.toFixed(0)}%).`);
+      }
     }
-  }
 
-  if (user.avg_latency_ms != null) {
-    const s = user.avg_latency_ms / 1000;
-    if (s < 2) {
-      insights.push(
-        "Fast decision-maker: reacts almost immediately once a post is seen."
-      );
-    } else if (s > 10) {
-      insights.push(
-        "Slow decision-maker: needs significant time before reacting."
-      );
+    // Dwell insights
+    if (usersWithDwell.length > 0) {
+      const dwellValues = usersWithDwell.map(u => u.avg_dwell_ms / 1000);
+      const avgDwell = dwellValues.reduce((a, b) => a + b, 0) / dwellValues.length;
+      const minDwell = Math.min(...dwellValues);
+      const maxDwell = Math.max(...dwellValues);
+      const minUser = usersWithDwell.find(u => (u.avg_dwell_ms / 1000) === minDwell);
+      const maxUser = usersWithDwell.find(u => (u.avg_dwell_ms / 1000) === maxDwell);
+      
+      if (avgDwell > 40) {
+        insights.push(`Group trend: High attention on average (avg ${avgDwell.toFixed(1)}s per post). ${minUser ? `Lowest attention: ${minUser.user_id.replace("user", "u")} (${minDwell.toFixed(1)}s).` : ""}`);
+      } else if (avgDwell < 10) {
+        insights.push(`Group trend: Low attention on average (avg ${avgDwell.toFixed(1)}s per post). ${maxUser ? `Highest attention: ${maxUser.user_id.replace("user", "u")} (${maxDwell.toFixed(1)}s).` : ""}`);
+      } else {
+        insights.push(`Average dwell time: ${avgDwell.toFixed(1)}s per post (range: ${minDwell.toFixed(1)}s–${maxDwell.toFixed(1)}s).`);
+      }
     }
-  }
 
-  if (user.topics && Object.keys(user.topics).length > 0) {
-    const sorted = Object.entries(user.topics).sort(
-      (a, b) => (b[1].weight || 0) - (a[1].weight || 0)
-    );
-    const [topTopic] = sorted[0];
-    insights.push(`Most sensitive to "${topTopic}" content.`);
-    if (sorted[1]) {
-      const [secondTopic] = sorted[1];
-      insights.push(
-        `Secondary interest in "${secondTopic}" – reacts and dwells there too.`
-      );
+    // Latency insights
+    if (usersWithLatency.length > 0) {
+      const latencyValues = usersWithLatency.map(u => u.avg_latency_ms / 1000);
+      const avgLatency = latencyValues.reduce((a, b) => a + b, 0) / latencyValues.length;
+      const minLatency = Math.min(...latencyValues);
+      const maxLatency = Math.max(...latencyValues);
+      const minUser = usersWithLatency.find(u => (u.avg_latency_ms / 1000) === minLatency);
+      const maxUser = usersWithLatency.find(u => (u.avg_latency_ms / 1000) === maxLatency);
+      
+      if (avgLatency < 2) {
+        insights.push(`Group trend: Fast decision-making on average (avg ${avgLatency.toFixed(1)}s). ${maxUser ? `Slowest: ${maxUser.user_id.replace("user", "u")} (${maxLatency.toFixed(1)}s).` : ""}`);
+      } else if (avgLatency > 10) {
+        insights.push(`Group trend: Slow decision-making on average (avg ${avgLatency.toFixed(1)}s). ${minUser ? `Fastest: ${minUser.user_id.replace("user", "u")} (${minLatency.toFixed(1)}s).` : ""}`);
+      } else {
+        insights.push(`Average reaction latency: ${avgLatency.toFixed(1)}s (range: ${minLatency.toFixed(1)}s–${maxLatency.toFixed(1)}s). ${minUser ? `Fastest: ${minUser.user_id.replace("user", "u")}; ` : ""}${maxUser ? `slowest: ${maxUser.user_id.replace("user", "u")}.` : ""}`);
+      }
     }
-  }
 
-  if (!insights.length) {
-    insights.push("Not enough data yet to generate behavioural insights.");
+    // Topic insights
+    if (user.topics && Object.keys(user.topics).length > 0) {
+      const sorted = Object.entries(user.topics).sort(
+        (a, b) => (b[1].weight || 0) - (a[1].weight || 0)
+      );
+      const [topTopic] = sorted[0];
+      insights.push(`Top topic by combined dwell+reactions: "${topTopic}".`);
+      if (sorted[1]) {
+        const [secondTopic] = sorted[1];
+        insights.push(`Secondary topic: "${secondTopic}".`);
+      }
+    }
+
+    if (!insights.length) {
+      insights.push("Not enough aggregate data yet to generate cohort insights.");
+    }
+  } else {
+    // Single-user mode: keep personal language
+    if (user.avg_max_scroll != null) {
+      if (user.avg_max_scroll > 75) {
+        insights.push("Deep scroller: consistently explores most of the feed.");
+      } else if (user.avg_max_scroll < 30) {
+        insights.push(
+          "Shallow scroller: rarely goes beyond the first part of the feed."
+        );
+      }
+    }
+
+    if (user.avg_dwell_ms != null) {
+      const s = user.avg_dwell_ms / 1000;
+      if (s > 40) {
+        insights.push(
+          "High attention: tends to spend a long time on each post in focus."
+        );
+      } else if (s < 10) {
+        insights.push(
+          "Low attention: glances over posts quickly before moving on."
+        );
+      }
+    }
+
+    if (user.avg_latency_ms != null) {
+      const s = user.avg_latency_ms / 1000;
+      if (s < 2) {
+        insights.push(
+          "Fast decision-maker: reacts almost immediately once a post is seen."
+        );
+      } else if (s > 10) {
+        insights.push(
+          "Slow decision-maker: needs significant time before reacting."
+        );
+      }
+    }
+
+    if (user.topics && Object.keys(user.topics).length > 0) {
+      const sorted = Object.entries(user.topics).sort(
+        (a, b) => (b[1].weight || 0) - (a[1].weight || 0)
+      );
+      const [topTopic] = sorted[0];
+      insights.push(`Most sensitive to "${topTopic}" content.`);
+      if (sorted[1]) {
+        const [secondTopic] = sorted[1];
+        insights.push(
+          `Secondary interest in "${secondTopic}" – reacts and dwells there too.`
+        );
+      }
+    }
+
+    if (!insights.length) {
+      insights.push("Not enough data yet to generate behavioural insights.");
+    }
   }
 
   insights.forEach((txt) => {
@@ -486,6 +622,7 @@ function renderIdeologySpectrum(user, userMap, isAllUsers, onUserClick) {
 
     axes.forEach((axis) => {
       // Collect scores for all users on this axis
+      // Handle both old format (number) and new format (object)
       const userScores = [];
       Object.entries(userMap).forEach(([userId, userData]) => {
         if (
@@ -493,9 +630,16 @@ function renderIdeologySpectrum(user, userMap, isAllUsers, onUserClick) {
           userData.ideology_spectrum[axis.key] !== undefined &&
           userData.ideology_spectrum[axis.key] !== null
         ) {
+          const scoreData = userData.ideology_spectrum[axis.key];
+          const score = typeof scoreData === "number" ? scoreData : (scoreData.score || 50);
+          const confidence = typeof scoreData === "object" ? (scoreData.confidence || "medium") : "medium";
+          const isNeutral = typeof scoreData === "object" ? (scoreData.is_neutral || false) : false;
+          
           userScores.push({
             userId,
-            score: userData.ideology_spectrum[axis.key],
+            score,
+            confidence,
+            isNeutral,
           });
         }
       });
@@ -572,13 +716,31 @@ function renderIdeologySpectrum(user, userMap, isAllUsers, onUserClick) {
       barTrack.appendChild(rightLabel);
 
       // Add markers for each user
-      userScores.forEach(({ userId, score }) => {
+      userScores.forEach(({ userId, score, confidence, isNeutral }) => {
         const clampedScore = Math.max(0, Math.min(100, score));
         const marker = document.createElement("div");
         marker.className = "spectrum-card-marker spectrum-card-marker-clickable";
         marker.style.left = `${clampedScore}%`;
         marker.style.borderColor = userColors[userId] || "#64748b";
-        marker.title = `Click to view ${userId}'s profile – ${clampedScore.toFixed(0)}/100 (${clampedScore < 40 ? axis.leftLabel : clampedScore > 60 ? axis.rightLabel : "center"})`;
+        
+        // Adjust opacity for low confidence
+        if (confidence === "low") {
+          marker.style.opacity = "0.6";
+        }
+        
+        // Add neutral indicator
+        if (isNeutral) {
+          marker.classList.add("spectrum-card-marker-neutral");
+        }
+        
+        const positionLabel = clampedScore < 40 ? axis.leftLabel : clampedScore > 60 ? axis.rightLabel : "center";
+        let tooltipText = `Click to view ${userId}'s profile – ${clampedScore.toFixed(0)}/100 (${positionLabel})`;
+        if (confidence === "low") {
+          tooltipText += " - low confidence";
+        } else if (isNeutral) {
+          tooltipText += " - neutral/mixed";
+        }
+        marker.title = tooltipText;
 
         // User label inside circle
         const label = document.createElement("div");
@@ -641,9 +803,23 @@ function renderIdeologySpectrum(user, userMap, isAllUsers, onUserClick) {
     }
 
     axes.forEach((axis) => {
-      const score = spectrum[axis.key];
-      if (score === undefined || score === null) {
+      const scoreData = spectrum[axis.key];
+      if (scoreData === undefined || scoreData === null) {
         return; // Skip if no data for this axis
+      }
+
+      // Handle both old format (number) and new format (object)
+      let score, confidence, sampleSize, isNeutral;
+      if (typeof scoreData === "number") {
+        score = scoreData;
+        confidence = "medium";
+        sampleSize = {};
+        isNeutral = false;
+      } else {
+        score = scoreData.score || 50;
+        confidence = scoreData.confidence || "medium";
+        sampleSize = scoreData.sample_size || {};
+        isNeutral = scoreData.is_neutral || false;
       }
 
       // Clamp score to 0-100
@@ -653,6 +829,9 @@ function renderIdeologySpectrum(user, userMap, isAllUsers, onUserClick) {
       // Create spectrum row
       const row = document.createElement("div");
       row.className = "spectrum-row";
+      if (confidence === "low") {
+        row.classList.add("spectrum-row-low-confidence");
+      }
 
       // Left label
       const leftLabelEl = document.createElement("div");
@@ -671,16 +850,28 @@ function renderIdeologySpectrum(user, userMap, isAllUsers, onUserClick) {
       const barFillLeft = document.createElement("div");
       barFillLeft.className = "spectrum-bar-fill spectrum-bar-fill-left";
       barFillLeft.style.width = `${100 - clampedScore}%`;
+      if (confidence === "low") {
+        barFillLeft.style.opacity = "0.5";
+      }
 
       // Bar fill (right side - represents right/conservative position)
       const barFillRight = document.createElement("div");
       barFillRight.className = "spectrum-bar-fill spectrum-bar-fill-right";
       barFillRight.style.width = `${clampedScore}%`;
+      if (confidence === "low") {
+        barFillRight.style.opacity = "0.5";
+      }
 
       // Marker at score position
       const marker = document.createElement("div");
       marker.className = "spectrum-marker";
       marker.style.left = `${clampedScore}%`;
+      if (confidence === "low") {
+        marker.style.opacity = "0.6";
+      }
+      if (isNeutral) {
+        marker.classList.add("spectrum-marker-neutral");
+      }
 
       barTrack.appendChild(barFillLeft);
       barTrack.appendChild(barFillRight);
@@ -692,10 +883,21 @@ function renderIdeologySpectrum(user, userMap, isAllUsers, onUserClick) {
       rightLabelEl.className = "spectrum-label spectrum-label-right";
       rightLabelEl.textContent = axis.rightLabel;
 
-      // Score display
+      // Score display with confidence indicator
       const scoreEl = document.createElement("div");
       scoreEl.className = "spectrum-score";
-      scoreEl.textContent = `${percentage}/100`;
+      let scoreText = `${percentage}/100`;
+      if (confidence === "low") {
+        scoreText += " (low confidence)";
+      } else if (isNeutral) {
+        scoreText += " (neutral)";
+      }
+      scoreEl.textContent = scoreText;
+      
+      // Add tooltip with sample size if available
+      if (sampleSize.reactions !== undefined) {
+        scoreEl.title = `Based on ${sampleSize.reactions} reaction${sampleSize.reactions !== 1 ? "s" : ""}`;
+      }
 
       row.appendChild(leftLabelEl);
       row.appendChild(barContainer);
@@ -758,14 +960,28 @@ async function init() {
       leftLabel,
       rightLabel,
       score,
-      explanation
+      explanation,
+      confidence = "medium",
+      sampleSize = {}
     ) {
       const dimension = document.createElement("div");
       dimension.className = "psychological-dimension";
 
       const header = document.createElement("div");
       header.className = "psychological-dimension-header";
-      header.textContent = title;
+      
+      const titleText = document.createElement("span");
+      titleText.textContent = title;
+      header.appendChild(titleText);
+      
+      // Add confidence badge
+      if (confidence) {
+        const confidenceBadge = document.createElement("span");
+        confidenceBadge.className = `confidence-badge confidence-${confidence}`;
+        confidenceBadge.textContent = confidence.toUpperCase();
+        header.appendChild(confidenceBadge);
+      }
+      
       dimension.appendChild(header);
 
       const barContainer = document.createElement("div");
@@ -788,15 +1004,30 @@ async function init() {
 
       const barFill = document.createElement("div");
       barFill.className = "psychological-bar-fill";
+      // Adjust opacity based on confidence
+      if (confidence === "low") {
+        barFill.style.opacity = "0.5";
+      } else if (confidence === "medium") {
+        barFill.style.opacity = "0.75";
+      }
       barFill.style.width = `${Math.max(0, Math.min(100, score))}%`;
 
       const marker = document.createElement("div");
       marker.className = "psychological-bar-marker";
+      if (confidence === "low") {
+        marker.style.opacity = "0.6";
+      }
       marker.style.left = `${Math.max(0, Math.min(100, score))}%`;
 
       barTrack.appendChild(barFill);
       barTrack.appendChild(marker);
       barContainer.appendChild(barTrack);
+
+      // Score display
+      const scoreEl = document.createElement("div");
+      scoreEl.className = "psychological-score";
+      scoreEl.textContent = `${Math.round(score)}/100`;
+      barContainer.appendChild(scoreEl);
 
       const explanationEl = document.createElement("div");
       explanationEl.className = "psychological-explanation";
@@ -813,6 +1044,22 @@ async function init() {
 
       if (isAllUsers && userMap) {
         // All users mode: show aggregated comparison
+        // Add header to indicate group profile
+        const header = document.createElement("div");
+        header.className = "psychological-profile-header";
+        header.style.cssText = "font-weight: 600; margin-bottom: 1rem; color: #1e293b;";
+        
+        // Format user list: if all users 1-5 present, show "1–5", otherwise list them
+        const userIds = Object.keys(userMap).map(u => parseInt(u.replace("user", ""))).sort((a, b) => a - b);
+        let userListText;
+        if (userIds.length === 5 && userIds[0] === 1 && userIds[4] === 5) {
+          userListText = "1–5";
+        } else {
+          userListText = userIds.join(", ");
+        }
+        header.textContent = `Group Psychological Profile (Users ${userListText})`;
+        container.appendChild(header);
+
         const profiles = [];
         Object.values(userMap).forEach((u) => {
           if (u.psychological_profile) {
@@ -824,80 +1071,128 @@ async function init() {
         });
 
         if (profiles.length === 0) {
-          container.textContent = "No psychological profile data yet.";
+          container.appendChild(document.createTextNode("No psychological profile data yet for the group."));
           return;
         }
 
-        // Compute averages
-        const avgEngagement =
-          profiles.reduce((sum, p) => sum + p.profile.engagement_level, 0) /
-          profiles.length;
-        const avgEmotional =
-          profiles.reduce(
-            (sum, p) => sum + p.profile.emotional_intensity,
-            0
-          ) / profiles.length;
-        const avgDecisionSpeed =
-          profiles.reduce(
-            (sum, p) => sum + p.profile.decision_speed_score,
-            0
-          ) / profiles.length;
-        const avgControversy =
-          profiles.reduce(
-            (sum, p) => sum + p.profile.controversy_seeking,
-            0
-          ) / profiles.length;
+        // Helper to extract score from new or old format
+        function getScore(metric) {
+          if (typeof metric === "number") return metric;
+          if (typeof metric === "object" && metric.score !== undefined) return metric.score;
+          return 0;
+        }
 
-        // Find extremes
-        const mostEngaged = profiles.reduce((max, p) =>
-          p.profile.engagement_level > max.profile.engagement_level ? p : max
-        );
-        const mostEmotional = profiles.reduce((max, p) =>
-          p.profile.emotional_intensity > max.profile.emotional_intensity
-            ? p
-            : max
-        );
-        const mostControversial = profiles.reduce((max, p) =>
-          p.profile.controversy_seeking > max.profile.controversy_seeking
-            ? p
-            : max
-        );
+        // Helper to compute range and find min/max users
+        function computeRangeAndExtremes(scores, profiles) {
+          if (scores.length === 0) return { min: 0, max: 0, range: 0, minUser: null, maxUser: null };
+          const min = Math.min(...scores);
+          const max = Math.max(...scores);
+          const range = max - min;
+          const minIndex = scores.indexOf(min);
+          const maxIndex = scores.indexOf(max);
+          return {
+            min,
+            max,
+            range,
+            minUser: profiles[minIndex] ? profiles[minIndex].userId.replace("user", "u") : null,
+            maxUser: profiles[maxIndex] ? profiles[maxIndex].userId.replace("user", "u") : null
+          };
+        }
 
-        // Render aggregated view
+        // Compute scores for all dimensions
+        const engagementData = profiles.map(p => ({
+          userId: p.userId,
+          score: getScore(p.profile.engagement_level)
+        }));
+        const emotionalData = profiles.map(p => ({
+          userId: p.userId,
+          score: getScore(p.profile.emotional_intensity)
+        }));
+        const decisionData = profiles.map(p => {
+          const ds = p.profile.decision_speed;
+          const score = typeof ds === "object" && ds.score !== undefined ? ds.score : getScore(p.profile.decision_speed_score);
+          return { userId: p.userId, score };
+        });
+        const controversyData = profiles.map(p => ({
+          userId: p.userId,
+          score: getScore(p.profile.controversy_seeking)
+        }));
+
+        const engagementScores = engagementData.map(d => d.score);
+        const emotionalScores = emotionalData.map(d => d.score);
+        const decisionScores = decisionData.map(d => d.score);
+        const controversyScores = controversyData.map(d => d.score);
+
+        const avgEngagement = engagementScores.reduce((a, b) => a + b, 0) / engagementScores.length;
+        const avgEmotional = emotionalScores.reduce((a, b) => a + b, 0) / emotionalScores.length;
+        const avgDecisionSpeed = decisionScores.reduce((a, b) => a + b, 0) / decisionScores.length;
+        const avgControversy = controversyScores.reduce((a, b) => a + b, 0) / controversyScores.length;
+
+        // Compute ranges and extremes
+        const engagementRange = computeRangeAndExtremes(engagementScores, profiles);
+        const emotionalRange = computeRangeAndExtremes(emotionalScores, profiles);
+        const decisionRange = computeRangeAndExtremes(decisionScores, profiles);
+        const controversyRange = computeRangeAndExtremes(controversyScores, profiles);
+
+        // Render aggregated view with cohort language
+        let engagementExplanation = `Group average: ${avgEngagement.toFixed(0)}/100 (range: ${engagementRange.min.toFixed(0)}–${engagementRange.max.toFixed(0)}).`;
+        if (engagementRange.maxUser && engagementRange.minUser) {
+          engagementExplanation += ` Highest: ${engagementRange.maxUser}; lowest: ${engagementRange.minUser}.`;
+        }
         renderProfileDimension(
           container,
           "Engagement Level",
           "Low",
           "High",
           avgEngagement,
-          `Average: ${avgEngagement.toFixed(0)}/100. Most engaged: ${mostEngaged.userId.replace("user", "u")}`
+          engagementExplanation,
+          "medium",
+          { users: profiles.length }
         );
 
+        let emotionalExplanation = `Group average: ${avgEmotional.toFixed(0)}/100 (range: ${emotionalRange.min.toFixed(0)}–${emotionalRange.max.toFixed(0)}).`;
+        if (emotionalRange.maxUser && emotionalRange.minUser) {
+          emotionalExplanation += ` Most emotional: ${emotionalRange.maxUser}; least: ${emotionalRange.minUser}.`;
+        }
         renderProfileDimension(
           container,
           "Emotional Intensity",
           "Calm / Neutral",
           "Highly Emotional",
           avgEmotional,
-          `Average: ${avgEmotional.toFixed(0)}/100. Most emotional: ${mostEmotional.userId.replace("user", "u")}`
+          emotionalExplanation,
+          "medium",
+          { users: profiles.length }
         );
 
+        let decisionExplanation = `Group average: ${avgDecisionSpeed.toFixed(0)}/100 (range: ${decisionRange.min.toFixed(0)}–${decisionRange.max.toFixed(0)}, balanced = 50).`;
+        if (decisionRange.maxUser && decisionRange.minUser) {
+          decisionExplanation += ` Most deliberate: ${decisionRange.maxUser}; most impulsive: ${decisionRange.minUser}.`;
+        }
         renderProfileDimension(
           container,
           "Decision Speed",
           "Impulsive",
           "Deliberate",
           avgDecisionSpeed,
-          `Average: ${avgDecisionSpeed.toFixed(0)}/100 (balanced = 50)`
+          decisionExplanation,
+          "medium",
+          { users: profiles.length }
         );
 
+        let controversyExplanation = `Group average: ${avgControversy.toFixed(0)}/100 (range: ${controversyRange.min.toFixed(0)}–${controversyRange.max.toFixed(0)}).`;
+        if (controversyRange.maxUser && controversyRange.minUser) {
+          controversyExplanation += ` Most controversy-seeking: ${controversyRange.maxUser}; least: ${controversyRange.minUser}.`;
+        }
         renderProfileDimension(
           container,
           "Controversy Seeking",
           "Avoids Conflict",
           "Seeks Controversy",
           avgControversy,
-          `Average: ${avgControversy.toFixed(0)}/100. Most controversy-seeking: ${mostControversial.userId.replace("user", "u")}`
+          controversyExplanation,
+          "medium",
+          { users: profiles.length }
         );
       } else {
         // Single user mode
@@ -908,14 +1203,41 @@ async function init() {
           return;
         }
 
+        // Helper to get confidence-aware language
+        function getConfidenceLanguage(baseText, confidence, isExtreme) {
+          if (confidence === "low") {
+            if (isExtreme) {
+              return `Early signal: ${baseText.toLowerCase()} (low confidence - not enough data yet)`;
+            }
+            return `Tentative: ${baseText.toLowerCase()} (based on limited data)`;
+          } else if (confidence === "medium") {
+            return `Seems to ${baseText.toLowerCase()}`;
+          } else {
+            return baseText; // High confidence - direct statement
+          }
+        }
+
         // Engagement Level
+        const engagement = profile.engagement_level || {};
+        const engagementScore = typeof engagement === "number" ? engagement : engagement.score || 0;
+        const engagementConf = typeof engagement === "object" ? engagement.confidence : "medium";
+        const engagementSample = typeof engagement === "object" ? engagement.sample_size : {};
+        
         let engagementLabel = "";
-        if (profile.engagement_level <= 30) {
-          engagementLabel = "Low engagement (skims the feed)";
-        } else if (profile.engagement_level <= 70) {
-          engagementLabel = "Moderate engagement";
+        const isHighEngagement = engagementScore > 70;
+        const isLowEngagement = engagementScore < 30;
+        
+        if (isLowEngagement) {
+          engagementLabel = getConfidenceLanguage("Low engagement (skims the feed)", engagementConf, true);
+        } else if (isHighEngagement) {
+          engagementLabel = getConfidenceLanguage("High engagement (often absorbed in the feed)", engagementConf, true);
         } else {
-          engagementLabel = "High engagement (often absorbed in the feed)";
+          engagementLabel = getConfidenceLanguage("Moderate engagement", engagementConf, false);
+        }
+        
+        // Add sample size info
+        if (engagementSample.sessions) {
+          engagementLabel += ` (${engagementSample.sessions} session${engagementSample.sessions !== 1 ? "s" : ""})`;
         }
 
         renderProfileDimension(
@@ -923,18 +1245,32 @@ async function init() {
           "Engagement Level",
           "Low",
           "High",
-          profile.engagement_level,
-          engagementLabel
+          engagementScore,
+          engagementLabel,
+          engagementConf,
+          engagementSample
         );
 
         // Emotional Intensity
+        const emotional = profile.emotional_intensity || {};
+        const emotionalScore = typeof emotional === "number" ? emotional : emotional.score || 0;
+        const emotionalConf = typeof emotional === "object" ? emotional.confidence : "medium";
+        const emotionalSample = typeof emotional === "object" ? emotional.sample_size : {};
+        
         let emotionalLabel = "";
-        if (profile.emotional_intensity <= 30) {
-          emotionalLabel = "Mostly neutral or light reactions";
-        } else if (profile.emotional_intensity <= 70) {
-          emotionalLabel = "Shows emotions regularly";
+        const isHighEmotional = emotionalScore > 70;
+        const isLowEmotional = emotionalScore < 30;
+        
+        if (isLowEmotional) {
+          emotionalLabel = getConfidenceLanguage("Mostly neutral or light reactions", emotionalConf, false);
+        } else if (isHighEmotional) {
+          emotionalLabel = getConfidenceLanguage("Highly emotionally reactive", emotionalConf, true);
         } else {
-          emotionalLabel = "Highly emotionally reactive";
+          emotionalLabel = getConfidenceLanguage("Shows emotions regularly", emotionalConf, false);
+        }
+        
+        if (emotionalSample.total_reactions) {
+          emotionalLabel += ` (${emotionalSample.total_reactions} reaction${emotionalSample.total_reactions !== 1 ? "s" : ""})`;
         }
 
         renderProfileDimension(
@@ -942,19 +1278,48 @@ async function init() {
           "Emotional Intensity",
           "Calm / Neutral",
           "Highly Emotional",
-          profile.emotional_intensity,
-          emotionalLabel
+          emotionalScore,
+          emotionalLabel,
+          emotionalConf,
+          emotionalSample
         );
 
         // Decision Speed
+        const decision = profile.decision_speed || {};
+        const decisionScore = typeof decision === "object" && decision.score !== undefined 
+          ? decision.score 
+          : (typeof decision === "number" ? decision : profile.decision_speed_score || 50);
+        const decisionLabel_text = typeof decision === "object" ? decision.label : profile.decision_speed || "balanced";
+        const decisionConf = typeof decision === "object" ? decision.confidence : "medium";
+        const decisionSample = typeof decision === "object" ? decision.sample_size : {};
+        const latency = typeof decision === "object" ? decision.avg_latency_seconds : profile.avg_latency_seconds;
+        
         let decisionLabel = "";
-        const latency = profile.avg_latency_seconds;
-        if (profile.decision_speed === "impulsive") {
-          decisionLabel = `Usually reacts quickly without much hesitation (${latency}s average).`;
-        } else if (profile.decision_speed === "balanced") {
-          decisionLabel = `Takes moderate time before reacting (${latency}s average).`;
+        if (decisionLabel_text === "impulsive") {
+          decisionLabel = getConfidenceLanguage(
+            `Usually reacts quickly without much hesitation`,
+            decisionConf,
+            true
+          );
+        } else if (decisionLabel_text === "deliberate") {
+          decisionLabel = getConfidenceLanguage(
+            `Takes time before reacting to most posts`,
+            decisionConf,
+            true
+          );
         } else {
-          decisionLabel = `Takes time before reacting to most posts (${latency}s average).`;
+          decisionLabel = getConfidenceLanguage(
+            `Takes moderate time before reacting`,
+            decisionConf,
+            false
+          );
+        }
+        
+        if (latency !== null && latency !== undefined) {
+          decisionLabel += ` (${latency}s average)`;
+        }
+        if (decisionSample.reactions) {
+          decisionLabel += ` - ${decisionSample.reactions} reaction${decisionSample.reactions !== 1 ? "s" : ""}`;
         }
 
         renderProfileDimension(
@@ -962,18 +1327,32 @@ async function init() {
           "Decision Speed",
           "Impulsive",
           "Deliberate",
-          profile.decision_speed_score,
-          decisionLabel
+          decisionScore,
+          decisionLabel,
+          decisionConf,
+          decisionSample
         );
 
         // Controversy Seeking
+        const controversy = profile.controversy_seeking || {};
+        const controversyScore = typeof controversy === "number" ? controversy : controversy.score || 0;
+        const controversyConf = typeof controversy === "object" ? controversy.confidence : "medium";
+        const controversySample = typeof controversy === "object" ? controversy.sample_size : {};
+        
         let controversyLabel = "";
-        if (profile.controversy_seeking <= 30) {
-          controversyLabel = "Avoids controversial topics";
-        } else if (profile.controversy_seeking <= 70) {
-          controversyLabel = "Engages with some sensitive content";
+        const isHighControversy = controversyScore > 70;
+        const isLowControversy = controversyScore < 30;
+        
+        if (isLowControversy) {
+          controversyLabel = getConfidenceLanguage("Avoids controversial topics", controversyConf, false);
+        } else if (isHighControversy) {
+          controversyLabel = getConfidenceLanguage("Strong attraction to divisive topics", controversyConf, true);
         } else {
-          controversyLabel = "Strong attraction to divisive topics";
+          controversyLabel = getConfidenceLanguage("Engages with some sensitive content", controversyConf, false);
+        }
+        
+        if (controversySample.sensitive_reactions !== undefined) {
+          controversyLabel += ` (${controversySample.sensitive_reactions} sensitive-topic reaction${controversySample.sensitive_reactions !== 1 ? "s" : ""})`;
         }
 
         renderProfileDimension(
@@ -981,8 +1360,10 @@ async function init() {
           "Controversy Seeking",
           "Avoids Conflict",
           "Seeks Controversy",
-          profile.controversy_seeking,
-          controversyLabel
+          controversyScore,
+          controversyLabel,
+          controversyConf,
+          controversySample
         );
       }
     }
@@ -995,7 +1376,7 @@ async function init() {
       try {
         renderMetrics(user, userCount);
         renderEmotionalProfile(user);
-        renderDecisionSpeed(user);
+        renderDecisionSpeed(user, userMap, isAllUsers);
         
         // Pass click handler to navigate to user profile
         const handleUserClick = (userId) => {
@@ -1016,7 +1397,7 @@ async function init() {
         }
         
         renderTopics(user, topicFilterValue);
-        renderInsights(user);
+        renderInsights(user, userMap, isAllUsers);
       } catch (err) {
         console.error("Error in update function:", err);
       }
